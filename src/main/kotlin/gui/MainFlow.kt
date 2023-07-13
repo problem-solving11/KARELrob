@@ -2,6 +2,7 @@ package gui
 
 import common.Diagnostic
 import common.Stack
+import common.whenCompleteAsync
 import logic.*
 import syntax.lexer.Lexer
 import syntax.parser.Parser
@@ -10,6 +11,7 @@ import vm.CodeGenerator
 import vm.Instruction
 import vm.VirtualMachine
 import java.awt.EventQueue
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.Timer
 
@@ -68,54 +70,43 @@ abstract class MainFlow : MainDesign(AtomicReference(Problem.karelsFirstProgram.
         controlPanel.checkStarted()
         worldPanel.isEnabled = false
 
-        fun cleanup() {
+        CompletableFuture.supplyAsync {
+            val start = System.nanoTime()
+            var nextRepaint = CHECK_REPAINT_NS
+
+            var worldCounter = 0
+            for (world in currentProblem.randomWorlds()) {
+                initialWorld = world
+                checkOneWorld(instructions, goalInstructions)
+                ++worldCounter
+
+                val elapsed = System.nanoTime() - start
+                if (elapsed >= CHECK_TOTAL_NS) {
+                    return@supplyAsync if (currentProblem.numWorlds == UNKNOWN) {
+                        "checked $worldCounter random worlds"
+                    } else {
+                        "checked $worldCounter random worlds\nfrom ${currentProblem.numWorlds} possible worlds"
+                    }
+                } else if (elapsed >= nextRepaint) {
+                    worldPanel.repaint()
+                    nextRepaint += CHECK_REPAINT_NS
+                }
+            }
+            return@supplyAsync "checked all ${currentProblem.numWorlds} possible worlds"
+        }.whenCompleteAsync(EventQueue::invokeLater) { successMessage, wrappedDiagnostic ->
             controlPanel.checkFinished(currentProblem.isRandom)
             worldPanel.isEnabled = true
 
             virtualMachinePanel.clearStack()
             editor.clearStack()
             update()
-        }
 
-        val start = System.nanoTime()
-        var nextRepaint = CHECK_REPAINT_NS
-
-        val worlds = currentProblem.randomWorlds().iterator()
-        var worldCounter = 0
-
-        fun checkBetweenRepaints() {
-            try {
-                while (worlds.hasNext()) {
-                    initialWorld = worlds.next()
-                    checkOneWorld(instructions, goalInstructions)
-                    ++worldCounter
-
-                    val elapsed = System.nanoTime() - start
-                    if (elapsed >= CHECK_TOTAL_NS) {
-                        cleanup()
-                        if (currentProblem.numWorlds == UNKNOWN) {
-                            showDiagnostic("checked $worldCounter random worlds")
-                        } else {
-                            showDiagnostic("checked $worldCounter random worlds\nfrom ${currentProblem.numWorlds} possible worlds")
-                        }
-                        return
-                    } else if (elapsed >= nextRepaint) {
-                        atomicWorld.set(initialWorld)
-                        worldPanel.repaint()
-                        nextRepaint += CHECK_REPAINT_NS
-                        EventQueue.invokeLater(::checkBetweenRepaints)
-                        return
-                    }
-                }
-                cleanup()
-                showDiagnostic("checked all ${currentProblem.numWorlds} possible worlds")
-            } catch (diagnostic: Diagnostic) {
-                cleanup()
-                showDiagnostic(diagnostic)
+            if (successMessage != null) {
+                showDiagnostic(successMessage)
+            } else {
+                showDiagnostic(wrappedDiagnostic!!.cause as Diagnostic)
             }
         }
-
-        checkBetweenRepaints()
     }
 
     private fun checkOneWorld(instructions: List<Instruction>, goalInstructions: List<Instruction>) {
