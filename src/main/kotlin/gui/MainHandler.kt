@@ -1,6 +1,9 @@
 package gui
 
 import freditor.Freditor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import logic.Problem
 import java.awt.event.KeyEvent
 import java.util.function.Consumer
@@ -67,8 +70,10 @@ class MainHandler : MainFlow() {
 
         controlPanel.check.addActionListener {
             controlPanel.startStopReset.text = "reset"
-            checkAgainst(currentProblem.goal)
-
+            val scope = CoroutineScope(Dispatchers.Main)
+            scope.launch {
+                checkAgainst(currentProblem.goal)
+            }
             editor.requestFocusInWindow()
         }
 
