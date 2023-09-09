@@ -128,6 +128,26 @@ class VirtualMachine(
                 ELSE shr 12 -> pc = if (pop() === Bool.FALSE) target else pc + 1
                 THEN shr 12 -> pc = if (pop() === Bool.TRUE) target else pc + 1
 
+                ELSE_INSTRUMENTED shr 12 -> {
+                    if (pop() === Bool.FALSE) {
+                        pc = target
+                        branchTaken = true
+                    } else {
+                        pc += 1
+                        branchSkipped = true
+                    }
+                }
+
+                THEN_INSTRUMENTED shr 12 -> {
+                    if (pop() === Bool.TRUE) {
+                        pc = target
+                        branchTaken = true
+                    } else {
+                        pc += 1
+                        branchSkipped = true
+                    }
+                }
+
                 else -> throw IllegalBytecode(bytecode)
             }
         }

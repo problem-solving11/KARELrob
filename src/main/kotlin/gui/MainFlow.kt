@@ -6,9 +6,7 @@ import logic.*
 import syntax.lexer.Lexer
 import syntax.parser.Parser
 import syntax.parser.program
-import vm.CodeGenerator
-import vm.Instruction
-import vm.VirtualMachine
+import vm.*
 import java.awt.EventQueue
 import javax.swing.Timer
 
@@ -37,7 +35,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
     }
 
     fun executeGoal(goal: String) {
-        start(vm.createGoalInstructions(goal))
+        start(createGoalInstructions(goal))
     }
 
     fun checkAgainst(goal: String) {
@@ -50,10 +48,10 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
             parser.program()
             val main = parser.sema.command(currentProblem.name)
             if (main != null) {
-                val instructions: List<Instruction> = CodeGenerator(parser.sema).generate(main)
+                val instructions = CodeGenerator(parser.sema, ELSE_INSTRUMENTED, THEN_INSTRUMENTED).generate(main)
                 virtualMachinePanel.setProgram(instructions)
 
-                val goalInstructions = vm.createGoalInstructions(goal)
+                val goalInstructions = createGoalInstructions(goal)
 
                 check(instructions, goalInstructions)
             } else {
@@ -65,7 +63,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
         }
     }
 
-    private fun check(instructions: List<Instruction>, goalInstructions: List<Instruction>) {
+    private fun check(instructions: MutableList<Instruction>, goalInstructions: List<Instruction>) {
         controlPanel.checkStarted()
         worldPanel.isEnabled = false
 
@@ -78,11 +76,25 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
             update()
         }
 
+        fun reportFirstRedundantCondition() {
+            for (instruction in instructions) {
+                if (instruction.isInstrumentedBranch()) {
+                    if (!instruction.branchSkipped) {
+                        throw Diagnostic(instruction.position, "condition was never true; body was never executed")
+                    }
+                    if (!instruction.branchTaken) {
+                        throw Diagnostic(instruction.position, "condition was always true; body was always executed")
+                    }
+                }
+            }
+        }
+
         val start = System.nanoTime()
         var nextRepaint = CHECK_REPAINT_NS
 
         val worlds = currentProblem.randomWorlds().iterator()
         var worldCounter = 0
+        var containsInstrumentedBranch = true
 
         fun checkBetweenRepaints() {
             try {
@@ -90,10 +102,15 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
                     initialWorld = worlds.next()
                     checkOneWorld(instructions, goalInstructions)
                     ++worldCounter
+                    if (containsInstrumentedBranch) {
+                        instructions.replaceAll(Instruction::deinstrumentEffectiveBranch)
+                        containsInstrumentedBranch = instructions.any(Instruction::isInstrumentedBranch)
+                    }
 
                     val elapsed = System.nanoTime() - start
                     if (elapsed >= CHECK_TOTAL_NS) {
                         cleanup()
+                        reportFirstRedundantCondition()
                         if (currentProblem.numWorlds == UNKNOWN) {
                             showDiagnostic("OK: checked $worldCounter random worlds")
                         } else {
@@ -109,6 +126,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
                     }
                 }
                 cleanup()
+                reportFirstRedundantCondition()
                 showDiagnostic("OK: checked all ${currentProblem.numWorlds} possible worlds")
             } catch (diagnostic: Diagnostic) {
                 cleanup()
@@ -185,7 +203,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
             parser.program()
             val main = parser.sema.command(currentProblem.name)
             if (main != null) {
-                val instructions = CodeGenerator(parser.sema).generate(main)
+                val instructions = CodeGenerator(parser.sema, ELSE, THEN).generate(main)
                 start(instructions)
             } else {
                 editor.setCursorTo(editor.length())

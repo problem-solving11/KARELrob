@@ -12,7 +12,7 @@ class CodeGeneratorTest {
         val parser = Parser(lexer)
         val program = parser.program()
         val main = program.commands.first()
-        return CodeGenerator(parser.sema).generate(main)
+        return CodeGenerator(parser.sema, ELSE, THEN).generate(main)
     }
 
     private fun assertBytecode(sourceCode: String, vararg bytecodes: Int) {

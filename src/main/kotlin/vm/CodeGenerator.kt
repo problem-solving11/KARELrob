@@ -7,8 +7,11 @@ import syntax.tree.*
 typealias CommandNameId = Int
 typealias Address = Int
 
-class CodeGenerator(private val sema: Sema) {
-
+class CodeGenerator(
+    private val sema: Sema,
+    private val elseInstruction: Int,
+    private val thenInstruction: Int,
+) {
     private val program: MutableList<Instruction> = createInstructionBuffer()
 
     private val pc: Int
@@ -40,7 +43,7 @@ class CodeGenerator(private val sema: Sema) {
         }
     }
 
-    fun generate(main: Command): List<Instruction> {
+    fun generate(main: Command): MutableList<Instruction> {
         todo.add(main)
         while (todo.isNotEmpty()) {
             val command = todo.removeFirst()
@@ -63,10 +66,10 @@ class CodeGenerator(private val sema: Sema) {
 
     private fun prepareForwardJump(token: Token): Int {
         if (lastInstruction.bytecode != NOT) {
-            generateInstruction(ELSE, token)
+            generateInstruction(elseInstruction, token)
         } else {
             removeLastInstruction()
-            generateInstruction(THEN, token)
+            generateInstruction(thenInstruction, token)
         }
         return pc - 1
     }

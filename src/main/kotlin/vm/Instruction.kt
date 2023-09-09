@@ -3,6 +3,16 @@ package vm
 import freditor.persistent.ChampMap
 
 data class Instruction(val bytecode: Int, val position: Int) {
+    var branchSkipped = false
+    var branchTaken = false
+
+    fun deinstrumentEffectiveBranch(): Instruction {
+        return if (branchSkipped && branchTaken) copy(bytecode = bytecode + (ELSE - ELSE_INSTRUMENTED)) else this
+    }
+
+    fun isInstrumentedBranch(): Boolean {
+        return bytecode >= ELSE_INSTRUMENTED
+    }
 
     val category: Int
         get() = bytecode.and(0xf000)
@@ -66,8 +76,8 @@ data class Instruction(val bytecode: Int, val position: Int) {
                 CALL -> "CALL %03x".format(target)
 
                 JUMP -> "JUMP %03x".format(target)
-                ELSE -> "ELSE %03x".format(target)
-                THEN -> "THEN %03x".format(target)
+                ELSE, ELSE_INSTRUMENTED -> "ELSE %03x".format(target)
+                THEN, THEN_INSTRUMENTED -> "THEN %03x".format(target)
 
                 else -> throw IllegalBytecode(bytecode)
             }
@@ -106,6 +116,8 @@ const val CALL = 0xa000
 const val JUMP = 0xb000
 const val ELSE = 0xc000
 const val THEN = 0xd000
+const val ELSE_INSTRUMENTED = 0xe000
+const val THEN_INSTRUMENTED = 0xf000
 
 val builtinCommands: ChampMap<String, Int> = ChampMap.of(
     "moveForward", MOVE_FORWARD,
