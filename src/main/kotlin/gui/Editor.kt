@@ -110,10 +110,8 @@ class Editor(freditor: Freditor) : FreditorUI(freditor, 60, 1) {
     }
 
     fun pop() {
-        if (!lines.isEmpty()) {
-            lines = lines.pop()
-            repaint()
-        }
+        lines = lines.pop()
+        repaint()
     }
 
     fun clearStack() {

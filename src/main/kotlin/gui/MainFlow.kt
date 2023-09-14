@@ -1,7 +1,6 @@
 package gui
 
 import common.Diagnostic
-import common.Stack
 import logic.*
 import syntax.lexer.Lexer
 import syntax.parser.Parser
@@ -156,7 +155,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
 
         try {
             virtualMachine.executeUserProgram()
-        } catch (_: Stack.Exhausted) {
+        } catch (_: VirtualMachine.Finished) {
         } catch (error: KarelError) {
             throw Diagnostic(virtualMachine.currentInstruction.position, error.message!!)
         }
@@ -182,7 +181,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
         createVirtualMachine(goalInstructions, goalWorlds::add)
         try {
             virtualMachine.executeGoalProgram()
-        } catch (_: Stack.Exhausted) {
+        } catch (_: VirtualMachine.Finished) {
         }
         return goalWorlds
     }
@@ -252,7 +251,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
         if (position > 0) {
             editor.setCursorTo(position)
         }
-        virtualMachinePanel.update(virtualMachine.pc, virtualMachine.stack)
+        virtualMachinePanel.update(virtualMachine.pc, virtualMachine.usedStack())
         worldPanel.repaint()
     }
 
@@ -265,7 +264,7 @@ abstract class MainFlow : MainDesign(WorldRef(Problem.karelsFirstProgram.randomW
         try {
             how()
             update()
-        } catch (_: Stack.Exhausted) {
+        } catch (_: VirtualMachine.Finished) {
             stop()
             update()
         } catch (error: KarelError) {

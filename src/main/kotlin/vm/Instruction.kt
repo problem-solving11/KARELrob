@@ -18,7 +18,7 @@ data class Instruction(val bytecode: Int, val position: Int) {
         get() = bytecode.and(0xf000)
 
     val target: Int
-        get() = bytecode.and(0x0fff)
+        get() = bytecode.shl(20).shr(20)
 
     private val compiledFromSource: Boolean
         get() = position > 0
@@ -68,7 +68,7 @@ data class Instruction(val bytecode: Int, val position: Int) {
             else -> when (category) {
                 PUSH -> when (target) {
                     0 -> "FALSE"
-                    1 -> "TRUE"
+                    -1 -> "TRUE"
                     else -> "PUSH %03x".format(target)
                 }
 
@@ -109,7 +109,7 @@ const val NORM = 0x0000
 
 const val PUSH = 0x8000
 const val FALSE = PUSH + 0
-const val TRUE = PUSH + 1
+const val TRUE = PUSH + 0xfff
 const val LOOP = 0x9000
 const val CALL = 0xa000
 
